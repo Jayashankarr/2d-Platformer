@@ -5,6 +5,8 @@ using UnityEngine;
 [RequireComponent (typeof(BoxCollider2D))]
 public class CharacterController : MonoBehaviour
 {
+    public const float skinWidth = .015f;
+
     [SerializeField]
     private int verticalRaycastCount = 2;
 
@@ -24,23 +26,39 @@ public class CharacterController : MonoBehaviour
     private float horizontalRaySpacing;
 
     private float verticalRaySpacing;
+
+    private Vector2 velocity;
     
-    void Awake()
+    private void Awake()
     { 
         collider = GetComponent<BoxCollider2D>();
         setUpRayCastBounds();
+    }
+
+    private void Start()
+    {
+        GameManager.Instance.Input.OnMoveBtn += onInput;
+    }
+
+    private void onInput(Vector2 velocity)
+    {
+        if(velocity.x > 0)
+        {
+            Debug.Log("press");
+        }
+        this.velocity = velocity *  0.1f;  
     }
 
     private void setUpRayCastBounds()
     {
         Bounds bounds = collider.bounds;
 
-        rayCastInfo.TopLeft = new Vector2(bounds.max.x , bounds.max.y);
-        rayCastInfo.TopRight = new Vector2(bounds.min.x , bounds.max.y);
+        rayCastInfo.TopLeft = new Vector2(bounds.min.x , bounds.max.y);
+        rayCastInfo.TopRight = new Vector2(bounds.max.x , bounds.max.y);
         rayCastInfo.BottomLeft = new Vector2(bounds.min.x , bounds.min.y);
         rayCastInfo.BottomRight = new Vector2(bounds.max.x , bounds.min.y);
-        verticalRaySpacing = bounds.size.y / verticalRaycastCount;
-        horizontalRaySpacing = bounds.size.x / horizontalRaycastCount;
+        verticalRaySpacing = bounds.size.x / (verticalRaycastCount - 1);
+        horizontalRaySpacing = bounds.size.y / (horizontalRaycastCount - 1);
     }
 
     void Update()
@@ -50,7 +68,7 @@ public class CharacterController : MonoBehaviour
 
     private void LateUpdate()
     {
-        Vector2 velocity = Vector2.up * gravity;
+        velocity.y +=  gravity;
         setUpRayCastBounds();
         updateVerticalCollision(ref velocity);
         transform.Translate(velocity);
@@ -59,12 +77,13 @@ public class CharacterController : MonoBehaviour
     private void updateCollisions(Vector2 deltaPos)
     {
         updateVerticalCollision(ref deltaPos);
-        updateHorizontalCollisions();
+        updateHorizontalCollisions(ref deltaPos);
     }
 
     private void updateVerticalCollision(ref Vector2 deltaPos)
     {
         VerticalDirection direction = (deltaPos.y > 0)? VerticalDirection.UP:VerticalDirection.DOWN;
+        float rayLength = Mathf.Abs(deltaPos.y);
 
 
         for(int i = 0; i < verticalRaycastCount; i++)
@@ -72,22 +91,43 @@ public class CharacterController : MonoBehaviour
             Vector2 ray = (direction == VerticalDirection.UP)? rayCastInfo.TopLeft:rayCastInfo.BottomLeft;
 
 
-            ray += Vector2.up * (verticalRaySpacing * i);
+            ray += Vector2.right  * (verticalRaySpacing * i);
 
             Debug.DrawRay(ray, Vector2.up * (int)direction,Color.red);
 
-            RaycastHit2D hitInfo = Physics2D.Raycast(ray ,Vector2.up * (int)direction, 1f , collisionMask);
+            RaycastHit2D hitInfo = Physics2D.Raycast(ray ,Vector2.up * (int)direction, rayLength , collisionMask);
 
-            if(hitInfo.collider != null && hitInfo.distance < 0.1f)
+            if (hitInfo.collider != null) 
             {
-                deltaPos.y = 0f;
-            }
+				deltaPos.y = (hitInfo.distance) * (int)direction;
+				rayLength = hitInfo.distance;
+			}
         }
     }
 
-    private void updateHorizontalCollisions()
+    private void updateHorizontalCollisions(ref Vector2 deltaPos)
     {
+        HorizontalDirection direction = (deltaPos.x > 0)? HorizontalDirection.RIGHT:HorizontalDirection.LEFT;
+        float rayLength = Mathf.Abs(deltaPos.x);
 
+
+        for(int i = 0; i < verticalRaycastCount; i++)
+        {
+            Vector2 ray = (direction == HorizontalDirection.RIGHT)? rayCastInfo.TopLeft:rayCastInfo.BottomLeft;
+
+
+            ray += Vector2.up  * (verticalRaySpacing * i);
+
+            Debug.DrawRay(ray, Vector2.right * (int)direction,Color.red);
+
+            RaycastHit2D hitInfo = Physics2D.Raycast(ray ,Vector2.right * (int)direction, rayLength , collisionMask);
+
+            if (hitInfo.collider != null) 
+            {
+				deltaPos.y = (hitInfo.distance) * (int)direction;
+				rayLength = hitInfo.distance;
+			}
+        }
     }
 
     private struct RayCastPositions
