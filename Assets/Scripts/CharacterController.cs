@@ -6,7 +6,7 @@ using UnityEngine;
 public class CharacterController : MonoBehaviour
 {
     [SerializeField]
-    private float skinWidth = 0.15f;
+    private float skinWidth = 0.05f;
 
     [SerializeField]
     private int verticalRaycastCount = 2;
@@ -17,7 +17,7 @@ public class CharacterController : MonoBehaviour
     [SerializeField]
     private LayerMask collisionMask;
 
-    private BoxCollider2D collider;
+    private BoxCollider2D boxCollider;
 
     private RayCastStartPositions rayCastInfo;
 
@@ -31,14 +31,21 @@ public class CharacterController : MonoBehaviour
 
     private VerticalDirection currentVerticalCollision;
 
+    private bool isReady = false;
+
     public bool IsGrounded
     {
         get{return isGrounded;}
     }
     private void Awake()
     { 
-        collider = GetComponent<BoxCollider2D>();
+        boxCollider = GetComponent<BoxCollider2D>();
         setUpRayCastBounds();
+    }
+
+    private void Start()
+    {
+        isReady = true;
     }
 
     private void Reset()
@@ -49,7 +56,8 @@ public class CharacterController : MonoBehaviour
 
     private void setUpRayCastBounds()
     {
-        Bounds bounds = collider.bounds;
+        Bounds bounds = boxCollider.bounds;
+        bounds.Expand (skinWidth * -2);
 
         rayCastInfo.TopLeft = new Vector2(bounds.min.x , bounds.max.y);
         rayCastInfo.TopRight = new Vector2(bounds.max.x , bounds.max.y);
@@ -73,6 +81,10 @@ public class CharacterController : MonoBehaviour
 
     public void Move(Vector2 moveDelta)
     {
+        if(!isReady)
+        {
+            return;
+        }
         setUpRayCastBounds();
         Reset();
         updateCollisions(ref moveDelta);
@@ -94,7 +106,7 @@ public class CharacterController : MonoBehaviour
     private void updateVerticalCollision(ref Vector2 deltaPos)
     {
         VerticalDirection direction = (deltaPos.y > 0)? VerticalDirection.UP:VerticalDirection.DOWN;
-        float rayLength = Mathf.Abs(deltaPos.y);
+        float rayLength = Mathf.Abs(deltaPos.y) + skinWidth;
 
 
         for(int i = 0; i < verticalRaycastCount; i++)
@@ -102,7 +114,7 @@ public class CharacterController : MonoBehaviour
             Vector2 ray = (direction == VerticalDirection.UP)? rayCastInfo.TopLeft:rayCastInfo.BottomLeft;
 
 
-            ray += Vector2.right  * (verticalRaySpacing * i);
+            ray += Vector2.right  * (verticalRaySpacing * i + deltaPos.x);
 
             Debug.DrawRay(ray, Vector2.up * (int)direction,Color.red);
 
@@ -110,7 +122,7 @@ public class CharacterController : MonoBehaviour
 
             if (hitInfo.collider != null) 
             {
-				deltaPos.y = (hitInfo.distance) * (int)direction;
+				deltaPos.y = (hitInfo.distance - skinWidth) * (int)direction;
 				rayLength = hitInfo.distance;
 
                 currentVerticalCollision = direction;
@@ -121,11 +133,14 @@ public class CharacterController : MonoBehaviour
     private void updateHorizontalCollisions(ref Vector2 deltaPos)
     {
         HorizontalDirection direction = (deltaPos.x > 0)? HorizontalDirection.RIGHT:HorizontalDirection.LEFT;
-        float rayLength = Mathf.Abs(deltaPos.x);
 
-        for(int i = 0; i < verticalRaycastCount; i++)
+        Debug.Log("Horizontal collision : " + direction);
+        float rayLength = Mathf.Abs(deltaPos.x) + skinWidth;
+
+
+        for(int i = 0; i < horizontalRaycastCount; i++)
         {
-            Vector2 ray = (direction == HorizontalDirection.RIGHT)? rayCastInfo.TopLeft:rayCastInfo.BottomLeft;
+            Vector2 ray = (direction == HorizontalDirection.RIGHT)? rayCastInfo.BottomRight:rayCastInfo.BottomLeft;
 
             ray += Vector2.up  * (horizontalRaySpacing * i);
 
@@ -136,7 +151,7 @@ public class CharacterController : MonoBehaviour
             if (hitInfo.collider != null) 
             {
                  Debug.Log("Collision direction : " + direction );
-				deltaPos.x = (hitInfo.distance) * (int)direction;
+				deltaPos.x = (hitInfo.distance - skinWidth) * (int)direction;
 				rayLength = hitInfo.distance;
 
                 currentHorizonalCollision = direction;
