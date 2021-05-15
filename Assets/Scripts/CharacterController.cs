@@ -5,7 +5,8 @@ using UnityEngine;
 [RequireComponent (typeof(BoxCollider2D))]
 public class CharacterController : MonoBehaviour
 {
-    public const float skinWidth = .015f;
+    [SerializeField]
+    private float skinWidth = 0.15f;
 
     [SerializeField]
     private int verticalRaycastCount = 2;
@@ -14,39 +15,36 @@ public class CharacterController : MonoBehaviour
     private int horizontalRaycastCount = 2;
 
     [SerializeField]
-    private float gravity = -0.0001f;
-
-    [SerializeField]
     private LayerMask collisionMask;
 
     private BoxCollider2D collider;
 
-    private RayCastPositions rayCastInfo;
+    private RayCastStartPositions rayCastInfo;
 
     private float horizontalRaySpacing;
 
     private float verticalRaySpacing;
 
-    private Vector2 velocity;
-    
+    private bool isGrounded;
+
+    private HorizontalDirection currentHorizonalCollision;
+
+    private VerticalDirection currentVerticalCollision;
+
+    public bool IsGrounded
+    {
+        get{return isGrounded;}
+    }
     private void Awake()
     { 
         collider = GetComponent<BoxCollider2D>();
         setUpRayCastBounds();
     }
 
-    private void Start()
+    private void Reset()
     {
-        GameManager.Instance.Input.OnMoveBtn += onInput;
-    }
-
-    private void onInput(Vector2 velocity)
-    {
-        if(velocity.x > 0)
-        {
-            Debug.Log("press");
-        }
-        this.velocity = velocity *  0.1f;  
+        currentHorizonalCollision = HorizontalDirection.NONE;
+        currentVerticalCollision = VerticalDirection.NONE;
     }
 
     private void setUpRayCastBounds()
@@ -61,20 +59,33 @@ public class CharacterController : MonoBehaviour
         horizontalRaySpacing = bounds.size.y / (horizontalRaycastCount - 1);
     }
 
-    void Update()
+    private void Update()
     {
-        
+        if(currentVerticalCollision == VerticalDirection.DOWN)
+        {
+            isGrounded = true;
+        }
+        else
+        {
+            isGrounded = false;
+        }
     }
 
-    private void LateUpdate()
+    public void Move(Vector2 moveDelta)
     {
-        velocity.y +=  gravity;
         setUpRayCastBounds();
-        updateVerticalCollision(ref velocity);
-        transform.Translate(velocity);
+        Reset();
+        updateCollisions(ref moveDelta);
+
+        Debug.Log("horizontal move : " + moveDelta.x );
+
+        Debug.Log("celocity : " + moveDelta);
+
+        transform.Translate(moveDelta);
+
     }
 
-    private void updateCollisions(Vector2 deltaPos)
+    private void updateCollisions(ref Vector2 deltaPos)
     {
         updateVerticalCollision(ref deltaPos);
         updateHorizontalCollisions(ref deltaPos);
@@ -101,6 +112,8 @@ public class CharacterController : MonoBehaviour
             {
 				deltaPos.y = (hitInfo.distance) * (int)direction;
 				rayLength = hitInfo.distance;
+
+                currentVerticalCollision = direction;
 			}
         }
     }
@@ -110,13 +123,11 @@ public class CharacterController : MonoBehaviour
         HorizontalDirection direction = (deltaPos.x > 0)? HorizontalDirection.RIGHT:HorizontalDirection.LEFT;
         float rayLength = Mathf.Abs(deltaPos.x);
 
-
         for(int i = 0; i < verticalRaycastCount; i++)
         {
             Vector2 ray = (direction == HorizontalDirection.RIGHT)? rayCastInfo.TopLeft:rayCastInfo.BottomLeft;
 
-
-            ray += Vector2.up  * (verticalRaySpacing * i);
+            ray += Vector2.up  * (horizontalRaySpacing * i);
 
             Debug.DrawRay(ray, Vector2.right * (int)direction,Color.red);
 
@@ -124,13 +135,16 @@ public class CharacterController : MonoBehaviour
 
             if (hitInfo.collider != null) 
             {
-				deltaPos.y = (hitInfo.distance) * (int)direction;
+                 Debug.Log("Collision direction : " + direction );
+				deltaPos.x = (hitInfo.distance) * (int)direction;
 				rayLength = hitInfo.distance;
+
+                currentHorizonalCollision = direction;
 			}
         }
     }
 
-    private struct RayCastPositions
+    private struct RayCastStartPositions
     {
         public Vector2 TopLeft;
 
@@ -141,8 +155,12 @@ public class CharacterController : MonoBehaviour
         public Vector2 BottomRight;
     }
 
+    
+
     private enum VerticalDirection
     {
+        NONE = 0,
+
         UP = 1,
 
         DOWN = -1
@@ -150,6 +168,8 @@ public class CharacterController : MonoBehaviour
 
     private enum HorizontalDirection
     {
+        NONE = 0,
+
         RIGHT = 1,
 
         LEFT = -1
